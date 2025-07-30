@@ -60,7 +60,6 @@ curl -X POST "YOUR_ENDPOINT_URL" \
 
 ```bash
 # Run local test script
-python test_model.py
 ```
 
 ## API Parameters

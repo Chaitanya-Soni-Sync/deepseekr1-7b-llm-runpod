@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application files
 COPY main.py .
 COPY download_model.py .
-COPY test_input.json .
 
 # Create necessary directories
 RUN mkdir -p /runpod-volume/hf_cache && \
