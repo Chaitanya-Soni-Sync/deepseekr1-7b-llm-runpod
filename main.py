@@ -11,8 +11,10 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-LOCAL_MODEL_PATH = "/workspace/model"
-CACHE_DIR = "/workspace/hf_cache"
+
+# Change these lines in main.py
+CACHE_DIR = "/runpod-volume/hf_cache"  # was "/workspace/hf_cache"
+LOCAL_MODEL_PATH = "/runpod-volume/model"  # was "/workspace/model"
 
 # Set environment variables for HuggingFace cache
 os.environ["HF_HOME"] = CACHE_DIR
