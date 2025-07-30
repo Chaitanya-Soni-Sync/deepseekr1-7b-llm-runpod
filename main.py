@@ -3,7 +3,8 @@ import torch
 import os
 import logging
 from pathlib import Path
-import shutil # Import shutil for rmtree
+import shutil
+from transformers import AutoTokenizer, AutoModelForCausalLM  # ADD THIS LINE
 
 # Configure logging
 logging.basicConfig(
@@ -28,15 +29,14 @@ def setup_directories():
     try:
         logger.info(f"Attempting to clear and set up directories: {CACHE_DIR}, {LOCAL_MODEL_PATH}")
         
-        # --- ADD THESE LINES TO CLEAR CACHE ---
         if Path(CACHE_DIR).exists():
             logger.info(f"Clearing existing cache in {CACHE_DIR}...")
             shutil.rmtree(CACHE_DIR, ignore_errors=True)
+        
         if Path(LOCAL_MODEL_PATH).exists():
             logger.info(f"Clearing existing model in {LOCAL_MODEL_PATH}...")
             shutil.rmtree(LOCAL_MODEL_PATH, ignore_errors=True)
-        # --- END ADDED LINES ---
-
+        
         Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
         Path(LOCAL_MODEL_PATH).mkdir(parents=True, exist_ok=True)
         logger.info(f"Directories created: {CACHE_DIR}, {LOCAL_MODEL_PATH}")
@@ -47,7 +47,6 @@ def setup_directories():
 def check_disk_space():
     """Check available disk space"""
     try:
-        import shutil
         total, used, free = shutil.disk_usage("/runpod-volume")
         free_gb = free // (1024**3)
         logger.info(f"Available disk space: {free_gb}GB")
@@ -68,7 +67,7 @@ def load_model_and_tokenizer():
         if Path(LOCAL_MODEL_PATH).exists() and any(Path(LOCAL_MODEL_PATH).iterdir()):
             logger.info(f"Loading model from local path: {LOCAL_MODEL_PATH}")
             tokenizer = AutoTokenizer.from_pretrained(
-                LOCAL_MODEL_PATH, 
+                LOCAL_MODEL_PATH,
                 trust_remote_code=True,
                 local_files_only=True
             )
@@ -83,7 +82,7 @@ def load_model_and_tokenizer():
         else:
             logger.info(f"Loading model from HuggingFace: {MODEL_NAME}")
             tokenizer = AutoTokenizer.from_pretrained(
-                MODEL_NAME, 
+                MODEL_NAME,
                 trust_remote_code=True,
                 cache_dir=CACHE_DIR
             )
@@ -101,6 +100,11 @@ def load_model_and_tokenizer():
             model.save_pretrained(LOCAL_MODEL_PATH)
             tokenizer.save_pretrained(LOCAL_MODEL_PATH)
         
+        # IMPORTANT: Set pad_token if it doesn't exist
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+            logger.info("Set pad_token to eos_token")
+        
         model.eval()
         logger.info("Model loaded and set to eval mode successfully")
         
@@ -117,32 +121,63 @@ def load_model_and_tokenizer():
 def run_inference(model, tokenizer, prompt, **kwargs):
     """Run model inference with proper error handling"""
     try:
-        # Extract generation parameters with defaults
-        max_new_tokens = kwargs.get('max_new_tokens', 1000)
-        temperature = kwargs.get('temperature', 0.7)
-        top_p = kwargs.get('top_p', 0.9)
+        # Extract generation parameters with safer defaults
+        max_new_tokens = min(kwargs.get('max_new_tokens', 512), 1024)  # Cap max tokens
+        temperature = max(0.1, min(kwargs.get('temperature', 0.7), 2.0))  # Clamp temperature
+        top_p = max(0.1, min(kwargs.get('top_p', 0.9), 1.0))  # Clamp top_p
         do_sample = kwargs.get('do_sample', True)
         
         logger.info(f"Running inference with prompt length: {len(prompt)}")
+        logger.info(f"Generation params - temp: {temperature}, top_p: {top_p}, max_tokens: {max_new_tokens}")
+        
+        # Input validation and preprocessing
+        if not prompt or not prompt.strip():
+            raise ValueError("Empty prompt provided")
+        
+        # Clean the prompt
+        prompt = prompt.strip()
         
         with torch.no_grad():
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            # Tokenize with proper padding and attention mask
+            inputs = tokenizer(
+                prompt, 
+                return_tensors="pt", 
+                padding=True, 
+                truncation=True,
+                max_length=2048  # Adjust based on model's context length
+            ).to(model.device)
+            
+            # Log input info for debugging
+            logger.info(f"Input shape: {inputs['input_ids'].shape}")
+            logger.info(f"Input device: {inputs['input_ids'].device}")
             
             # Check for potential issues with input
-            if inputs['input_ids'].shape[1] > 4000:  # Adjust based on model's context length
+            if inputs['input_ids'].shape[1] > 2048:
                 logger.warning(f"Input length ({inputs['input_ids'].shape[1]}) may be too long")
             
+            # Check for invalid tokens
+            if torch.any(inputs['input_ids'] < 0):
+                logger.error("Invalid negative token IDs found")
+                raise ValueError("Invalid token IDs in input")
+            
+            # Generate with more robust parameters
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
                 do_sample=do_sample,
-                temperature=temperature,
-                top_p=top_p,
-                pad_token_id=tokenizer.eos_token_id,
-                eos_token_id=tokenizer.eos_token_id
+                temperature=temperature if do_sample else 1.0,  # Don't use temp if not sampling
+                top_p=top_p if do_sample else 1.0,  # Don't use top_p if not sampling
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+                repetition_penalty=1.1,  # Add repetition penalty
+                use_cache=True,
+                output_scores=False,  # Don't return scores to save memory
+                return_dict_in_generate=False
             )
             
+            # Decode the response
             generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
             # Remove the input prompt from the output
             response = generated_text[len(prompt):].strip()
             
@@ -151,18 +186,23 @@ def run_inference(model, tokenizer, prompt, **kwargs):
             
     except Exception as e:
         logger.error(f"Inference failed: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         raise
 
 # Initialize model and tokenizer globally
 logger.info("Initializing application...")
 setup_directories()
-tokenizer, model = load_model_and_tokenizer()
-logger.info("Application initialization complete")
+
+try:
+    tokenizer, model = load_model_and_tokenizer()
+    logger.info("Application initialization complete")
+except Exception as e:
+    logger.error(f"Failed to initialize model: {e}")
+    raise
 
 def handler(event):
     """Main handler function for RunPod serverless"""
     logger.info("Handler started")
-    
     try:
         # Extract and validate input
         user_input = event.get("input", {})
@@ -181,11 +221,18 @@ def handler(event):
                 "message": "Prompt must be a non-empty string"
             }
         
-        # Extract optional generation parameters
+        # Validate prompt length
+        if len(prompt) > 10000:  # Reasonable limit
+            return {
+                "status": "error",
+                "message": "Prompt too long (max 10000 characters)"
+            }
+        
+        # Extract and validate generation parameters
         generation_params = {
-            'max_new_tokens': user_input.get('max_new_tokens', 1000),
-            'temperature': user_input.get('temperature', 0.7),
-            'top_p': user_input.get('top_p', 0.9),
+            'max_new_tokens': min(user_input.get('max_new_tokens', 512), 1024),
+            'temperature': max(0.1, min(user_input.get('temperature', 0.7), 2.0)),
+            'top_p': max(0.1, min(user_input.get('top_p', 0.9), 1.0)),
             'do_sample': user_input.get('do_sample', True)
         }
         
@@ -210,3 +257,4 @@ if __name__ == '__main__':
     logger.info("Starting RunPod serverless...")
     runpod.serverless.start({
         'handler': handler
+    })
