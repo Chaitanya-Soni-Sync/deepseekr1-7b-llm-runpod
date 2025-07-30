@@ -4,7 +4,7 @@ import os
 import logging
 from pathlib import Path
 import shutil
-from transformers import AutoTokenizer, AutoModelForCausalLM  # ADD THIS LINE
+from transformers import AutoTokenizer, AutoModelForCausalLM  # ✅ ADD THIS LINE
 
 # Configure logging
 logging.basicConfig(
@@ -100,7 +100,7 @@ def load_model_and_tokenizer():
             model.save_pretrained(LOCAL_MODEL_PATH)
             tokenizer.save_pretrained(LOCAL_MODEL_PATH)
         
-        # IMPORTANT: Set pad_token if it doesn't exist
+        # ✅ CRITICAL FIX: Set pad_token if missing
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
             logger.info("Set pad_token to eos_token")
@@ -121,61 +121,52 @@ def load_model_and_tokenizer():
 def run_inference(model, tokenizer, prompt, **kwargs):
     """Run model inference with proper error handling"""
     try:
-        # Extract generation parameters with safer defaults
-        max_new_tokens = min(kwargs.get('max_new_tokens', 512), 1024)  # Cap max tokens
-        temperature = max(0.1, min(kwargs.get('temperature', 0.7), 2.0))  # Clamp temperature
-        top_p = max(0.1, min(kwargs.get('top_p', 0.9), 1.0))  # Clamp top_p
+        # ✅ SAFE PARAMETER VALIDATION
+        max_new_tokens = min(kwargs.get('max_new_tokens', 512), 1024)
+        temperature = max(0.1, min(kwargs.get('temperature', 0.7), 2.0))  # Clamp 0.1-2.0
+        top_p = max(0.1, min(kwargs.get('top_p', 0.9), 1.0))  # Clamp 0.1-1.0
         do_sample = kwargs.get('do_sample', True)
         
         logger.info(f"Running inference with prompt length: {len(prompt)}")
-        logger.info(f"Generation params - temp: {temperature}, top_p: {top_p}, max_tokens: {max_new_tokens}")
+        logger.info(f"Params - temp: {temperature}, top_p: {top_p}, max_tokens: {max_new_tokens}")
         
-        # Input validation and preprocessing
+        # ✅ INPUT VALIDATION
         if not prompt or not prompt.strip():
             raise ValueError("Empty prompt provided")
         
-        # Clean the prompt
-        prompt = prompt.strip()
-        
         with torch.no_grad():
-            # Tokenize with proper padding and attention mask
+            # ✅ PROPER TOKENIZATION WITH TRUNCATION
             inputs = tokenizer(
-                prompt, 
+                prompt.strip(), 
                 return_tensors="pt", 
-                padding=True, 
+                padding=True,
                 truncation=True,
-                max_length=2048  # Adjust based on model's context length
+                max_length=2048
             ).to(model.device)
             
-            # Log input info for debugging
+            # ✅ DEBUG LOGGING
             logger.info(f"Input shape: {inputs['input_ids'].shape}")
-            logger.info(f"Input device: {inputs['input_ids'].device}")
+            logger.info(f"pad_token_id: {tokenizer.pad_token_id}, eos_token_id: {tokenizer.eos_token_id}")
             
             # Check for potential issues with input
             if inputs['input_ids'].shape[1] > 2048:
                 logger.warning(f"Input length ({inputs['input_ids'].shape[1]}) may be too long")
             
-            # Check for invalid tokens
-            if torch.any(inputs['input_ids'] < 0):
-                logger.error("Invalid negative token IDs found")
-                raise ValueError("Invalid token IDs in input")
-            
-            # Generate with more robust parameters
+            # ✅ SAFER GENERATION WITH MORE PARAMETERS
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=max_new_tokens,
                 do_sample=do_sample,
-                temperature=temperature if do_sample else 1.0,  # Don't use temp if not sampling
-                top_p=top_p if do_sample else 1.0,  # Don't use top_p if not sampling
-                pad_token_id=tokenizer.pad_token_id,
+                temperature=temperature if do_sample else 1.0,
+                top_p=top_p if do_sample else 1.0,
+                pad_token_id=tokenizer.pad_token_id,  # Use pad_token_id instead of eos
                 eos_token_id=tokenizer.eos_token_id,
-                repetition_penalty=1.1,  # Add repetition penalty
+                repetition_penalty=1.1,  # Prevent repetition
                 use_cache=True,
-                output_scores=False,  # Don't return scores to save memory
+                output_scores=False,  # Save memory
                 return_dict_in_generate=False
             )
             
-            # Decode the response
             generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
             # Remove the input prompt from the output
@@ -221,14 +212,14 @@ def handler(event):
                 "message": "Prompt must be a non-empty string"
             }
         
-        # Validate prompt length
-        if len(prompt) > 10000:  # Reasonable limit
+        # ✅ VALIDATE PROMPT LENGTH
+        if len(prompt) > 8000:
             return {
                 "status": "error",
-                "message": "Prompt too long (max 10000 characters)"
+                "message": "Prompt too long (max 8000 characters)"
             }
         
-        # Extract and validate generation parameters
+        # ✅ SAFE PARAMETER EXTRACTION
         generation_params = {
             'max_new_tokens': min(user_input.get('max_new_tokens', 512), 1024),
             'temperature': max(0.1, min(user_input.get('temperature', 0.7), 2.0)),
