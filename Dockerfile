@@ -1,47 +1,28 @@
+# Use the official RunPod PyTorch image with CUDA and Python pre-installed
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive
+# Set environment variables for HuggingFace cache and unbuffered Python output
+ENV HF_HOME=/runpod-volume/hf_cache
+ENV TRANSFORMERS_CACHE=/runpod-volume/hf_cache
+ENV HF_DATASETS_CACHE=/runpod-volume/hf_cache
 ENV PYTHONUNBUFFERED=1
-ENV HF_HOME=/workspace/hf_cache
-ENV TRANSFORMERS_CACHE=/workspace/hf_cache
-ENV HF_DATASETS_CACHE=/workspace/hf_cache
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    python3.11 \
-    python3.11-pip \
-    python3.11-dev \
-    git \
-    wget \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create symbolic links for python
-RUN ln -s /usr/bin/python3.11 /usr/bin/python3 && \
-    ln -s /usr/bin/python3.11 /usr/bin/python
 
 # Set working directory
 WORKDIR /workspace
 
-# Create necessary directories
-RUN mkdir -p /workspace/hf_cache /workspace/model /workspace/logs
+# (Optional) Install git, wget, curl if you need them for your code or debugging
+RUN apt-get update && apt-get install -y git wget curl && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY main.py .
-COPY download_model.py .
+# Copy all application files into the container
+COPY . .
 
-# Pre-download model (optional - comment out if causing space issues)
-# RUN python3 download_model.py
+# Expose the HTTP port (matches your RunPod endpoint config)
+EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# Run the application
-CMD ["python3", "-u", "main.py"]
+# Start the serverless handler
+CMD ["python", "main.py"]
