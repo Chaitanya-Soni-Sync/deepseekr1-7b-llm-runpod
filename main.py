@@ -3,7 +3,7 @@ import torch
 import os
 import logging
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer
+import shutil # Import shutil for rmtree
 
 # Configure logging
 logging.basicConfig(
@@ -24,13 +24,24 @@ os.environ["TRANSFORMERS_CACHE"] = CACHE_DIR
 os.environ["HF_HUB_CACHE"] = CACHE_DIR
 
 def setup_directories():
-    """Create necessary directories"""
+    """Create necessary directories and clear existing cache."""
     try:
+        logger.info(f"Attempting to clear and set up directories: {CACHE_DIR}, {LOCAL_MODEL_PATH}")
+        
+        # --- ADD THESE LINES TO CLEAR CACHE ---
+        if Path(CACHE_DIR).exists():
+            logger.info(f"Clearing existing cache in {CACHE_DIR}...")
+            shutil.rmtree(CACHE_DIR, ignore_errors=True)
+        if Path(LOCAL_MODEL_PATH).exists():
+            logger.info(f"Clearing existing model in {LOCAL_MODEL_PATH}...")
+            shutil.rmtree(LOCAL_MODEL_PATH, ignore_errors=True)
+        # --- END ADDED LINES ---
+
         Path(CACHE_DIR).mkdir(parents=True, exist_ok=True)
         Path(LOCAL_MODEL_PATH).mkdir(parents=True, exist_ok=True)
         logger.info(f"Directories created: {CACHE_DIR}, {LOCAL_MODEL_PATH}")
     except Exception as e:
-        logger.error(f"Failed to create directories: {e}")
+        logger.error(f"Failed to create/clear directories: {e}")
         raise
 
 def check_disk_space():
