@@ -2,9 +2,10 @@ import runpod
 import torch
 import os
 import logging
+import numpy as np
 from pathlib import Path
 import shutil
-from transformers import AutoTokenizer, AutoModelForCausalLM  # ✅ ADD THIS LINE
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 # Configure logging
 logging.basicConfig(
@@ -118,13 +119,58 @@ def load_model_and_tokenizer():
         logger.error(f"Failed to load model: {str(e)}")
         raise
 
-def run_inference(model, tokenizer, prompt, **kwargs):
-    """Run model inference with proper error handling"""
+def safe_generate(model, tokenizer, inputs, **kwargs):
+    """Safe generation with fallback strategies to prevent probability tensor errors"""
     try:
-        # ✅ SAFE PARAMETER VALIDATION
+        # First attempt with original parameters
+        return model.generate(**inputs, **kwargs)
+    except RuntimeError as e:
+        if "probability tensor" in str(e).lower() or "inf" in str(e).lower() or "nan" in str(e).lower():
+            logger.warning(f"Probability tensor error detected: {e}")
+            logger.info("Attempting fallback generation with safer parameters...")
+            
+            # Fallback 1: Increase temperature and use greedy decoding
+            try:
+                fallback_kwargs = kwargs.copy()
+                fallback_kwargs.update({
+                    'temperature': 1.0,
+                    'do_sample': False,
+                    'top_p': 1.0,
+                    'top_k': None,
+                    'repetition_penalty': 1.0
+                })
+                logger.info("Fallback 1: Using greedy decoding with temperature=1.0")
+                return model.generate(**inputs, **fallback_kwargs)
+            except RuntimeError as e2:
+                logger.warning(f"Fallback 1 failed: {e2}")
+                
+                # Fallback 2: Use even more conservative parameters
+                try:
+                    fallback_kwargs = kwargs.copy()
+                    fallback_kwargs.update({
+                        'temperature': 1.0,
+                        'do_sample': False,
+                        'top_p': 1.0,
+                        'top_k': None,
+                        'repetition_penalty': 1.0,
+                        'max_new_tokens': min(kwargs.get('max_new_tokens', 512), 256)  # Reduce max tokens
+                    })
+                    logger.info("Fallback 2: Using minimal generation parameters")
+                    return model.generate(**inputs, **fallback_kwargs)
+                except RuntimeError as e3:
+                    logger.error(f"All fallback strategies failed: {e3}")
+                    raise RuntimeError(f"Generation failed after all fallback attempts: {e3}")
+        else:
+            # Re-raise if it's not a probability tensor error
+            raise
+
+def run_inference(model, tokenizer, prompt, **kwargs):
+    """Run model inference with proper error handling and fallback strategies"""
+    try:
+        # ✅ SAFE PARAMETER VALIDATION WITH BETTER BOUNDS
         max_new_tokens = min(kwargs.get('max_new_tokens', 512), 1024)
-        temperature = max(0.1, min(kwargs.get('temperature', 0.7), 2.0))  # Clamp 0.1-2.0
-        top_p = max(0.1, min(kwargs.get('top_p', 0.9), 1.0))  # Clamp 0.1-1.0
+        temperature = max(0.5, min(kwargs.get('temperature', 0.7), 1.5))  # Clamp 0.5-1.5 for stability
+        top_p = max(0.5, min(kwargs.get('top_p', 0.9), 1.0))  # Clamp 0.5-1.0
         do_sample = kwargs.get('do_sample', True)
         
         logger.info(f"Running inference with prompt length: {len(prompt)}")
@@ -152,20 +198,24 @@ def run_inference(model, tokenizer, prompt, **kwargs):
             if inputs['input_ids'].shape[1] > 2048:
                 logger.warning(f"Input length ({inputs['input_ids'].shape[1]}) may be too long")
             
-            # ✅ SAFER GENERATION WITH MORE PARAMETERS
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=do_sample,
-                temperature=temperature if do_sample else 1.0,
-                top_p=top_p if do_sample else 1.0,
-                pad_token_id=tokenizer.pad_token_id,  # Use pad_token_id instead of eos
-                eos_token_id=tokenizer.eos_token_id,
-                repetition_penalty=1.1,  # Prevent repetition
-                use_cache=True,
-                output_scores=False,  # Save memory
-                return_dict_in_generate=False
-            )
+            # ✅ SAFER GENERATION WITH MORE PARAMETERS AND FALLBACK
+            generation_kwargs = {
+                'max_new_tokens': max_new_tokens,
+                'do_sample': do_sample,
+                'temperature': temperature if do_sample else 1.0,
+                'top_p': top_p if do_sample else 1.0,
+                'pad_token_id': tokenizer.pad_token_id,
+                'eos_token_id': tokenizer.eos_token_id,
+                'repetition_penalty': 1.1,
+                'use_cache': True,
+                'output_scores': False,
+                'return_dict_in_generate': False,
+                'num_beams': 1,  # Use single beam for stability
+                'early_stopping': True
+            }
+            
+            # Use safe generation with fallback
+            outputs = safe_generate(model, tokenizer, inputs, **generation_kwargs)
             
             generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
             
@@ -219,11 +269,11 @@ def handler(event):
                 "message": "Prompt too long (max 8000 characters)"
             }
         
-        # ✅ SAFE PARAMETER EXTRACTION
+        # ✅ SAFE PARAMETER EXTRACTION WITH BETTER BOUNDS
         generation_params = {
             'max_new_tokens': min(user_input.get('max_new_tokens', 512), 1024),
-            'temperature': max(0.1, min(user_input.get('temperature', 0.7), 2.0)),
-            'top_p': max(0.1, min(user_input.get('top_p', 0.9), 1.0)),
+            'temperature': max(0.5, min(user_input.get('temperature', 0.7), 1.5)),  # Safer bounds
+            'top_p': max(0.5, min(user_input.get('top_p', 0.9), 1.0)),  # Safer bounds
             'do_sample': user_input.get('do_sample', True)
         }
         

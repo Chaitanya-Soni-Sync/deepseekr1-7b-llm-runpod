@@ -8,7 +8,7 @@ tokenizers>=0.15.0
 runpod>=1.6.0
 
 # Utilities
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 requests>=2.31.0
 tqdm>=4.65.0
 
