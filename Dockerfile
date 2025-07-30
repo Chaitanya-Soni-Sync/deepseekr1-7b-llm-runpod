@@ -1,28 +1,41 @@
-# Use the official RunPod PyTorch image with CUDA and Python pre-installed
 FROM runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04
 
-# Set environment variables for HuggingFace cache and unbuffered Python output
-ENV HF_HOME=/runpod-volume/hf_cache
-ENV TRANSFORMERS_CACHE=/runpod-volume/hf_cache
-ENV HF_DATASETS_CACHE=/runpod-volume/hf_cache
+# Set environment variables
 ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /workspace
 
-# (Optional) Install git, wget, curl if you need them for your code or debugging
-RUN apt-get update && apt-get install -y git wget curl && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python dependencies
+# Copy requirements first for better caching
 COPY requirements.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy all application files into the container
-COPY . .
+# Copy application files
+COPY main.py .
+COPY download_model.py .
+COPY test_input.json .
 
-# Expose the HTTP port (matches your RunPod endpoint config)
-EXPOSE 8080
+# Create necessary directories
+RUN mkdir -p /runpod-volume/hf_cache && \
+    mkdir -p /runpod-volume/model
 
-# Start the serverless handler
+# Set permissions
+RUN chmod +x main.py
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD python -c "import torch; print('GPU available:', torch.cuda.is_available())" || exit 1
+
+# Default command
 CMD ["python", "main.py"]
