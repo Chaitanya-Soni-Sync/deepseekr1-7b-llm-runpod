@@ -1,0 +1,70 @@
+worker exited with exit code 1
+lndmbaiodrjeok[info]RuntimeError: Data processing error: CAS service error : IO Error: No space left on device (os error 28)\n
+lndmbaiodrjeok[info]    download_files(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 629, in xet_get\n
+lndmbaiodrjeok[info]    xet_get(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1723, in _download_to_tmp_and_move\n
+lndmbaiodrjeok[info]    _download_to_tmp_and_move(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1171, in _hf_hub_download_to_cache_dir\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return _hf_hub_download_to_cache_dir(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/file_download.py", line 1010, in hf_hub_download\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return fn(*args, **kwargs)\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return hf_hub_download(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/_snapshot_download.py", line 306, in _inner_hf_hub_download\n
+lndmbaiodrjeok[info]             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    result = self.fn(*self.args, **self.kwargs)\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/concurrent/futures/thread.py", line 59, in run\n
+lndmbaiodrjeok[info]    raise self._exception\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return self.__get_result()\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 456, in result\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return fut.result(timeout)\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel\n
+lndmbaiodrjeok[info]          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    yield _result_or_cancel(fs.pop())\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator\n
+lndmbaiodrjeok[info]               ^^^^^^^^\n
+lndmbaiodrjeok[info]    for obj in iterable:\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/tqdm/std.py", line 1181, in __iter__\n
+
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/tqdm/contrib/concurrent.py", line 69, in thread_map\n
+lndmbaiodrjeok[info]    thread_map(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/_snapshot_download.py", line 332, in snapshot_download\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return fn(*args, **kwargs)\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn\n
+lndmbaiodrjeok[info]    snapshot_download(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/utils/hub.py", line 491, in cached_files\n
+lndmbaiodrjeok[info]    raise e\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/utils/hub.py", line 564, in cached_files\n
+lndmbaiodrjeok[info]                       ^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    cached_filenames = cached_files(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/utils/hub.py", line 1117, in get_checkpoint_shard_files\n
+lndmbaiodrjeok[info]                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    checkpoint_files, sharded_metadata = get_checkpoint_shard_files(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/modeling_utils.py", line 1299, in _get_resolved_checkpoint_files\n
+lndmbaiodrjeok[info]                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    checkpoint_files, sharded_metadata = _get_resolved_checkpoint_files(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/modeling_utils.py", line 4851, in from_pretrained\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return func(*args, **kwargs)\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/modeling_utils.py", line 315, in _wrapper\n
+lndmbaiodrjeok[info]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    return model_class.from_pretrained(\n
+lndmbaiodrjeok[info]  File "/usr/local/lib/python3.12/site-packages/transformers/models/auto/auto_factory.py", line 600, in from_pretrained\n
+lndmbaiodrjeok[info]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n
+lndmbaiodrjeok[info]    model = AutoModelForCausalLM.from_pretrained(\n
+lndmbaiodrjeok[info]  File "//main.py", line 13, in <module>\n
+lndmbaiodrjeok[info]Traceback (most recent call last):\n
+lndmbaiodrjeok[info]\rFetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]\n
+lndmbaiodrjeok[info]  warnings.warn(\n
+lndmbaiodrjeok[info]/usr/local/lib/python3.12/site-packages/huggingface_hub/file_download.py:801: UserWarning: Not enough free disk space to download the file. The expected file size is: 6624.68 MB. The target location /root/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1-Distill-Qwen-7B/blobs only has 2.25 MB free disk space.\n
+lndmbaiodrjeok[info]  warnings.warn(\n
